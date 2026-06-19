@@ -103,7 +103,56 @@
                 <p id="chatStatus">Ready to help explain your medical reports.</p>
             </div>
 
-            <div id="chatMessages"></div>
+            <div id="chatMessages">
+
+                <div class="empty-chat" id="emptyChat">
+
+                    <div class="avatar-placeholder">
+                        <img src="Assets/AI.png" id="aiAvatar" alt="MeDeCode AI">
+                    </div>
+
+                    <h2>Welcome to MeDeCode AI</h2>
+
+                    <p>
+                        Upload a medical report and I'll explain it in simple language.
+                    </p>
+
+                    <div class="supported-types">
+
+                        <span>🩸 Blood Tests</span>
+
+                        <span>💊 Prescriptions</span>
+
+                        <span>🧠 MRI</span>
+
+                        <span>🫀 ECG</span>
+
+                        <span>📄 Discharge Summary</span>
+
+                    </div>
+
+                </div>
+
+            </div>
+            <div id="suggestedQuestions" class="hidden">
+
+                <button class="suggest-chip">
+                    🍎 Can I eat fruits?
+                </button>
+
+                <button class="suggest-chip">
+                    💊 Explain my medicines
+                </button>
+
+                <button class="suggest-chip">
+                    🏃 Can I exercise?
+                </button>
+
+                <button class="suggest-chip">
+                    📅 What should I do next?
+                </button>
+
+            </div>
 
             <div class="chat-input-area">
                 <input type="text" id="chatInput" placeholder="Ask a question about your report..." autocomplete="off">
