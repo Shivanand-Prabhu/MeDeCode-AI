@@ -323,6 +323,15 @@ function showPreview(file) {
   previewContainer.appendChild(title);
   previewContainer.appendChild(info);
 
+  const status = document.createElement("div");
+  status.className = "upload-success";
+  status.innerHTML = `
+<div>✅ Upload Complete</div>
+<small>Ready for AI Analysis</small>
+`;
+
+  previewContainer.appendChild(status);
+
   if (file.type.startsWith("image/")) {
     const img = document.createElement("img");
     img.src = URL.createObjectURL(file);
@@ -348,6 +357,7 @@ function showPreview(file) {
   analyze.onclick = async () => {
     analyze.disabled = true;
     analyze.textContent = "⏳ Analyzing...";
+
     try {
       openChat();
 
@@ -364,11 +374,14 @@ function showPreview(file) {
       displayAIAnalysis(result);
 
       currentReportContext = JSON.stringify(result);
-      alert("Analysis Complete! Check the console for the Gemini response.");
     } catch (error) {
       console.error(error);
-      alert("Analysis failed. Please try again.");
+
+      hideTyping();
+
+      addMessage("❌ " + error.message, "ai");
     }
+
     analyze.disabled = false;
     analyze.textContent = "🧠 Decode My Report";
   };
@@ -401,11 +414,71 @@ function showPreview(file) {
 }
 
 function addMessage(text, type) {
+  document.getElementById("emptyChat")?.remove();
+
   const message = document.createElement("div");
+
   message.className = `message ${type}-message`;
-  message.textContent = text;
+
+  if (type === "ai") {
+    message.innerHTML = `
+<div class="ai-message-top">
+<div class="chat-avatar">
+<img src="Assets/AI.png" onerror="this.style.display='none'">
+</div>
+<div class="ai-name">
+<b>MeDeCode AI</b>
+<small>Just now</small>
+</div>
+</div>
+<div class="message-body"></div>
+`;
+
+    message.querySelector(".message-body").innerText = text;
+
+    const copy = document.createElement("button");
+    const read = document.createElement("button");
+
+    read.className = "read-btn";
+
+    read.innerHTML = "🔊 Read";
+
+    read.onclick = () => {
+      speakText(text, read);
+    };
+
+    copy.className = "copy-btn";
+
+    copy.innerHTML = "📋 Copy";
+
+    copy.onclick = () => {
+      navigator.clipboard.writeText(text);
+
+      copy.innerHTML = "✅ Copied";
+
+      setTimeout(() => {
+        copy.innerHTML = "📋 Copy";
+      }, 1500);
+    };
+
+    const actions = document.createElement("div");
+
+    actions.className = "message-actions";
+
+    actions.append(copy, read);
+
+    message.appendChild(actions);
+  } else {
+    message.innerText = text;
+  }
+
   chatMessages.appendChild(message);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  chatMessages.scrollTo({
+    top: chatMessages.scrollHeight,
+
+    behavior: "smooth",
+  });
 }
 
 function showTyping() {
@@ -526,7 +599,62 @@ function displayAIAnalysis(data) {
   }
 
   addMessage(message, "ai");
+  document.getElementById("suggestedQuestions").classList.remove("hidden");
 }
+let currentSpeech = null;
+
+function speakText(text, button) {
+  if (!("speechSynthesis" in window)) {
+    alert("Text-to-Speech is not supported on this browser.");
+    return;
+  }
+
+  if (speechSynthesis.speaking) {
+    speechSynthesis.cancel();
+
+    if (currentSpeech === button) {
+      button.innerHTML = "🔊 Read";
+      currentSpeech = null;
+      return;
+    }
+  }
+
+  const clean = text
+    .replace(/📋|📖|💊|⚠|🍎|📅|🩺|❓|•/g, " ")
+    .replace(/\n/g, ". ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const utterance = new SpeechSynthesisUtterance(clean);
+
+  const lang = localStorage.getItem("medeLanguage") || "en";
+
+  const voices = speechSynthesis.getVoices();
+
+  const voice = voices.find((v) => v.lang.toLowerCase().startsWith(lang));
+
+  if (voice) utterance.voice = voice;
+
+  utterance.lang = lang;
+
+  utterance.rate = 0.95;
+  utterance.pitch = 1;
+
+  button.innerHTML = "⏹ Stop";
+
+  currentSpeech = button;
+
+  utterance.onend = () => {
+    button.innerHTML = "🔊 Read";
+    currentSpeech = null;
+  };
+
+  speechSynthesis.speak(utterance);
+}
+
+window.speechSynthesis.onvoiceschanged = () => {
+  speechSynthesis.getVoices();
+};
 async function sendQuestion() {
   const question = chatInput.value.trim();
 
@@ -549,4 +677,69 @@ async function sendQuestion() {
 
     addMessage("❌ " + error.message, "ai");
   }
+}
+document.querySelectorAll(".suggest-chip").forEach((button) => {
+  button.onclick = () => {
+    chatInput.value = button.innerText.replace(/[🍎💊🏃📅]/g, "").trim();
+
+    sendQuestion();
+  };
+});
+async function playAnalysisAnimation() {
+  const loading = addLoadingMessage();
+
+  const steps = [
+    "📄 Reading your report...",
+
+    "🩸 Detecting document type...",
+
+    "💊 Identifying medicines...",
+
+    "📖 Explaining medical terms...",
+
+    "🌍 Translating into your selected language...",
+
+    "🧠 Generating personalized summary...",
+  ];
+
+  for (const step of steps) {
+    loading.innerHTML = step;
+
+    await new Promise((resolve) => setTimeout(resolve, 700));
+  }
+
+  loading.parentElement.parentElement.remove();
+}
+function addLoadingMessage() {
+  document.getElementById("emptyChat")?.remove();
+
+  const wrapper = document.createElement("div");
+
+  wrapper.className = "message ai-message";
+
+  wrapper.innerHTML = `
+<div class="ai-message-top">
+<div class="chat-avatar">
+<img src="Assets/AI.png" onerror="this.style.display='none'">
+</div>
+<div class="ai-name">
+<b>MeDeCode AI</b>
+<small>Analyzing...</small>
+</div>
+</div>
+
+<div class="loading-text">
+📄 Reading your report...
+</div>
+`;
+
+  chatMessages.appendChild(wrapper);
+
+  chatMessages.scrollTo({
+    top: chatMessages.scrollHeight,
+    behavior: "smooth",
+    a,
+  });
+
+  return wrapper.querySelector(".loading-text");
 }
