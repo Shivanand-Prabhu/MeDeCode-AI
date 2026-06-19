@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>MeDeCode | Decode. Understand. Take Action.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <header>
+        <nav>
+
+            <div class="logo">
+                <img src="Assets/Logo.jpg" alt="MeDeCode Logo">
+                <h2>MeDeCode</h2>
+            </div>
+
+            <div class="nav-right">
+
+                <div class="language-picker">
+
+                    <button id="languageButton">
+                        🌍
+                        <span id="selectedLanguage">English</span>
+                        <span id="arrow">▼</span>
+                    </button>
+
+                    <div class="language-menu" id="languageMenu">
+                        <div class="language-search">
+                            <input type="text" id="languageSearch" data-i18n-placeholder="searchLanguage"
+                                placeholder="Search Language...">
+
+                        </div>
+
+                        <div id="languageList"></div>
+
+                    </div>
+
+                </div>
+
+                <button id="seniorModeBtn">
+                    👴
+                    <span data-i18n="seniorMode">Senior Mode</span>
+                </button>
+
+            </div>
+
+        </nav>
+    </header>
+
+    <main>
+
+        <section class="hero">
+
+            <h1 data-i18n="heroTitle">Understand Medical Documents</h1>
+
+            <p data-i18n="heroSubtitle">
+                Upload blood reports, prescriptions, hospital bills and discharge summaries to receive simple AI-powered
+                explanations.
+            </p>
+
+        </section>
+
+        <section class="upload-section">
+            <div class="upload-card" id="dropZone">
+                <div id="uploadContent">
+
+                    <div class="upload-icon">📄</div>
+
+                    <h2 data-i18n="uploadHeading">
+                        Upload Your Medical Document
+                    </h2>
+
+                    <p data-i18n="uploadDescription">
+                        Drag & Drop your report here or browse from your device.
+                    </p>
+
+                    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" hidden>
+
+                    <button id="browseBtn">
+                        Browse Files
+                    </button>
+
+                    <p class="supported-files">
+                        Supported: PDF • JPG • PNG
+                    </p>
+
+                </div>
+
+                <div id="previewContainer"></div>
+            </div>
+        </section>
+        <section id="chatSection" class="hidden">
+            <div class="chat-header">
+                <h2>💬 MeDeCode AI</h2>
+                <p id="chatStatus">Ready to help explain your medical reports.</p>
+            </div>
+
+            <div id="chatMessages"></div>
+
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" placeholder="Ask a question about your report..." autocomplete="off">
+                <button id="sendChatBtn">➤</button>
+            </div>
+        </section>
+        <footer>
+            <p>
+                © 2026 <strong>MeDeCode</strong> • <span data-i18n="footerLine">Making healthcare understandable for
+                    everyone.</span>
+            </p>
+
+        </footer>
+
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.5.136/pdf.min.js"></script>
+    <script src="translations.js"></script>
+    <script src="config.js"></script>
+    <script src="gemini.js"></script>
+    <script src="script.js"></script>
+
+</body>
+
+</html>
