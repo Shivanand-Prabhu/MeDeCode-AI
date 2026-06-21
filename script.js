@@ -638,6 +638,13 @@ function openChat() {
   chatSection.scrollIntoView({ behavior: "smooth" });
 }
 function displayAIAnalysis(data) {
+  // 1. Check if the incoming data is a plain follow-up text string
+  if (typeof data === "string") {
+    addMessage(data, "ai");
+    return;
+  }
+
+  // 2. If it's a structured object from a fresh upload, format it nicely
   let message = "";
 
   if (data.documentType) {
@@ -747,16 +754,12 @@ function displayTreatmentPlan(plan) {
   treatmentPlan = plan;
 
   treatmentContainer.classList.remove("hidden");
-
   treatmentCards.innerHTML = "";
 
   const times = [
     ["morning", "🌅 Morning"],
-
     ["afternoon", "☀ Afternoon"],
-
     ["evening", "🌇 Evening"],
-
     ["night", "🌙 Night"],
   ];
 
@@ -764,41 +767,28 @@ function displayTreatmentPlan(plan) {
     if (!plan[key] || !plan[key].length) return;
 
     const card = document.createElement("div");
-
     card.className = "timeCard";
-
     card.innerHTML = `<h3>${title}</h3>`;
 
     plan[key].forEach((item, index) => {
       const row = document.createElement("label");
-
       row.className = "task";
 
+      // Fallback matching logic ensures keys map accurately 
+      const name = item.medicine || item.title || item.name || "Unknown Medicine";
+      const dosage = item.dosage || item.strength || "";
+      const timing = item.timing || "";
+
       row.innerHTML = `
-
-<input
-
-type="checkbox"
-
-${item.completed ? "checked" : ""}
-
-onchange="toggleTask('${key}',${index},this)">
-
-<div class="taskInfo ${item.completed ? "completed" : ""}">
-
-<b>${item.title || item.medicine}</b>
-
-<small>
-
-${item.dosage || ""}
-
-${item.timing || ""}
-
-</small>
-
-</div>
-
-`;
+        <input
+          type="checkbox"
+          ${item.completed ? "checked" : ""}
+          onchange="toggleTask('${key}',${index},this)">
+        <div class="taskInfo ${item.completed ? "completed" : ""}">
+          <b>${name}</b>
+          <small>${dosage} ${timing ? '• ' + timing : ''}</small>
+        </div>
+      `;
 
       card.appendChild(row);
     });
@@ -808,33 +798,22 @@ ${item.timing || ""}
 
   if (plan.importantInstructions?.length) {
     const card = document.createElement("div");
-
     card.className = "timeCard";
-
     card.innerHTML = "<h3>⚠ Important Instructions</h3>";
 
     plan.importantInstructions.forEach((item, index) => {
+      const instructionText = item.title || item.instruction || (typeof item === 'string' ? item : "Instruction");
       card.innerHTML += `
-
-<div class="task">
-
-<input
-
-type="checkbox"
-
-${item.completed ? "checked" : ""}
-
-onchange="toggleInstruction(${index},this)">
-
-<div class="taskInfo ${item.completed ? "completed" : ""}">
-
-<b>${item.title}</b>
-
-</div>
-
-</div>
-
-`;
+        <div class="task">
+          <input
+            type="checkbox"
+            ${item.completed ? "checked" : ""}
+            onchange="toggleInstruction(${index},this)">
+          <div class="taskInfo ${item.completed ? "completed" : ""}">
+            <b>${instructionText}</b>
+          </div>
+        </div>
+      `;
     });
 
     treatmentCards.appendChild(card);
@@ -1286,6 +1265,10 @@ function saveReportToHistory(newReport) {
 }
 // Append this code block to the very bottom of your script.js file
 
+/*=================================================================
+            TRACKING HISTORY & ON-DEMAND GRAPHS CLOSURES
+=================================================================*/
+
 const clearHistoryBtn = document.getElementById("clearHistoryBtn");
 
 if (clearHistoryBtn) {
@@ -1300,7 +1283,6 @@ if (clearHistoryBtn) {
       localStorage.removeItem("medeReportHistory");
 
       // Clear current app runtime reference state if needed
-      // (Optional: cleans up current active chat view elements)
       const chatMessages = document.getElementById("chatMessages");
       if (chatMessages) {
         chatMessages.innerHTML = `
@@ -1311,6 +1293,170 @@ if (clearHistoryBtn) {
       }
 
       alert("Medical history tracking cleared successfully.");
+    }
+  };
+}
+
+// Fixed: Moved outside clearHistoryBtn scope so it initializes properly on load
+function checkForOnDemandChart(userQuestion) {
+  const lowerQ = userQuestion.toLowerCase();
+
+  // Only trigger if the user asks for a chart, trend, progress visual, or graph
+  if (
+    !lowerQ.includes("chart") &&
+    !lowerQ.includes("graph") &&
+    !lowerQ.includes("trend") &&
+    !lowerQ.includes("visual")
+  ) {
+    return;
+  }
+
+  const history = JSON.parse(localStorage.getItem("medeReportHistory") || "[]");
+  if (history.length < 2) return; // Needs historical points to build a timeline
+
+  // Determine which biomarker the user wants to see based on keywords
+  let targetBiomarker = "";
+  if (lowerQ.includes("rbc") || lowerQ.includes("red blood"))
+    targetBiomarker = "rbc";
+  else if (lowerQ.includes("wbc") || lowerQ.includes("white blood"))
+    targetBiomarker = "wbc";
+  else if (lowerQ.includes("hemoglobin") || lowerQ.includes("hb"))
+    targetBiomarker = "hemoglobin";
+  else if (lowerQ.includes("platelet")) targetBiomarker = "platelet";
+  else if (lowerQ.includes("iron") || lowerQ.includes("ferritin"))
+    targetBiomarker = "iron";
+  else if (
+    lowerQ.includes("sugar") ||
+    lowerQ.includes("glucose") ||
+    lowerQ.includes("hba1c")
+  )
+    targetBiomarker = "glucose";
+  else {
+    // Default to the first out-of-range item if they just asked broadly for "my trend chart"
+    const currentReport =
+      typeof reportData !== "undefined"
+        ? reportData
+        : history[history.length - 1];
+    if (currentReport && currentReport.labResults) {
+      const problematicTest =
+        currentReport.labResults.find(
+          (t) => t.status === "Low" || t.status === "High",
+        ) || currentReport.labResults[0];
+      if (problematicTest) targetBiomarker = problematicTest.name.toLowerCase();
+    }
+  }
+
+  if (!targetBiomarker) return;
+
+  const trendDataPoints = [];
+  let formalTestName = "";
+
+  // Compile specific test metrics securely from local records
+  history.forEach((report) => {
+    if (report.labResults) {
+      const matchingTest = report.labResults.find((t) =>
+        t.name.toLowerCase().includes(targetBiomarker),
+      );
+      if (matchingTest && report.savedAt) {
+        const numericVal = parseFloat(
+          matchingTest.value || matchingTest.result,
+        );
+        if (!isNaN(numericVal)) {
+          formalTestName = matchingTest.name;
+          trendDataPoints.push({
+            date: report.savedAt,
+            value: numericVal,
+            unit: matchingTest.unit || "",
+          });
+        }
+      }
+    }
+  });
+
+  // Inject chart into the active chat interface on match
+  if (trendDataPoints.length > 1) {
+    const chatMessages = document.getElementById("chatMessages");
+
+    const chartWrapper = document.createElement("div");
+    chartWrapper.className = "chart-trend-container";
+    chartWrapper.style.marginTop = "10px";
+    chartWrapper.style.padding = "12px";
+    chartWrapper.style.background = "#f8fafc";
+    chartWrapper.style.borderRadius = "12px";
+    chartWrapper.style.border = "1px solid #e2e8f0";
+
+    const chartTitle = document.createElement("h4");
+    chartTitle.style.margin = "0 0 10px 0";
+    chartTitle.style.color = "#1e293b";
+    chartTitle.style.fontSize = "13px";
+    chartTitle.textContent = `📊 Dynamic Requested Trend: ${formalTestName}`;
+    chartWrapper.appendChild(chartTitle);
+
+    const canvas = document.createElement("canvas");
+    canvas.id = `chart_${Date.now()}`;
+    chartWrapper.appendChild(canvas);
+
+    // Append it directly as its own block in the chat window flow
+    chatMessages.appendChild(chartWrapper);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    setTimeout(() => {
+      const ctx = canvas.getContext("2d");
+      if (window.Chart) {
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: trendDataPoints.map((p) => p.date),
+            datasets: [
+              {
+                label: `${formalTestName} (${trendDataPoints[0].unit || ""})`,
+                data: trendDataPoints.map((p) => p.value),
+                borderColor: "#10b981", // Uses a nice distinct emerald green for user requests
+                backgroundColor: "rgba(16, 185, 129, 0.1)",
+                borderWidth: 2.5,
+                tension: 0.2,
+                fill: true,
+                pointBackgroundColor: "#10b981",
+                pointRadius: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { grid: { color: "#f1f5f9" } },
+              x: { grid: { display: false } },
+            },
+          },
+        });
+      } else {
+        console.error("Chart.js library is not loaded on the window object.");
+      }
+    }, 50);
+  }
+}
+
+// Fixed: Moved your chat submission wire outside the historical clean up scope
+if (sendChatBtn) {
+  sendChatBtn.onclick = async () => {
+    const userQuestionText = chatInput.value.trim();
+    if (!userQuestionText) return;
+
+    addMessage(userQuestionText, "user");
+    chatInput.value = "";
+    showTyping();
+
+    try {
+      const aiResponseText = await askFollowUpQuestion(userQuestionText);
+      hideTyping();
+      displayAIAnalysis(aiResponseText);
+      checkForOnDemandChart(userQuestionText);
+    } catch (error) {
+      console.error(error);
+      hideTyping();
+      addMessage("❌ Sorry, something went wrong.", "ai");
     }
   };
 }
