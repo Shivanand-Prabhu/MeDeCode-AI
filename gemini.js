@@ -406,9 +406,7 @@ function getSelectedLanguageName() {
 }
 
 async function askFollowUpQuestion(question) {
-
   const language = getSelectedLanguageName();
-
   const lowerQuestion = question.toLowerCase();
 
   let relevantData = reportData;
@@ -430,16 +428,16 @@ async function askFollowUpQuestion(question) {
     lowerQuestion.includes("vitamin") ||
     lowerQuestion.includes("calcium") ||
     lowerQuestion.includes("potassium") ||
-    lowerQuestion.includes("sodium")
+    lowerQuestion.includes("sodium") ||
+    lowerQuestion.includes("previous") ||
+    lowerQuestion.includes("compared") ||
+    lowerQuestion.includes("past") ||
+    lowerQuestion.includes("improved")
   ) {
-
     relevantData = reportData?.labResults || [];
-
   }
-
   // Medicine Questions
   else if (
-
     lowerQuestion.includes("medicine") ||
     lowerQuestion.includes("tablet") ||
     lowerQuestion.includes("capsule") ||
@@ -448,177 +446,101 @@ async function askFollowUpQuestion(question) {
     lowerQuestion.includes("dosage") ||
     lowerQuestion.includes("take") ||
     lowerQuestion.includes("pill")
-
   ) {
-
     relevantData = reportData?.medicines || [];
-
   }
-
   // Diagnosis
-
   else if (
-
     lowerQuestion.includes("diagnosis") ||
     lowerQuestion.includes("disease") ||
     lowerQuestion.includes("condition") ||
     lowerQuestion.includes("problem")
-
   ) {
-
     relevantData = reportData?.diagnosis || [];
-
   }
-
   // Diet
-
   else if (
-
     lowerQuestion.includes("diet") ||
     lowerQuestion.includes("eat") ||
     lowerQuestion.includes("food") ||
     lowerQuestion.includes("drink")
-
   ) {
-
     relevantData = reportData?.dietSuggestions || [];
-
   }
-
   // Doctor Advice
-
   else if (
-
     lowerQuestion.includes("doctor") ||
     lowerQuestion.includes("follow") ||
     lowerQuestion.includes("next") ||
     lowerQuestion.includes("instruction") ||
     lowerQuestion.includes("advice")
-
   ) {
-
     relevantData = reportData?.nextSteps || [];
-
   }
 
+  // Retrieve storage history data
+  const rawHistory = localStorage.getItem("medeReportHistory") || "[]";
+  const historyData = JSON.parse(rawHistory);
+
+  // Strip down historical entries to vital context elements only
+  const simplifiedHistory = historyData.map(report => ({
+    savedAt: report.savedAt,
+    documentType: report.documentType,
+    reportTitle: report.reportTitle,
+    labResults: report.labResults || [],
+    diagnosis: report.diagnosis || []
+  }));
+
   const prompt = `
-
 You are MeDeCode AI.
+The user has uploaded a current medical report and is asking a question.
 
-The user has already uploaded a medical report.
-
-The following extracted information is the ONLY information you may use.
-
+--------------------------------------------------
+CURRENT REPORT DATA (Active Session)
+--------------------------------------------------
 ${JSON.stringify(relevantData, null, 2)}
 
-User Question:
+--------------------------------------------------
+HISTORICAL MEDICAL RECORDS (Saved from Past Uploads)
+--------------------------------------------------
+Use this historical data to track trends, changes, and answer comparison questions (e.g., RBC count changes over time, improvements, etc.).
+${JSON.stringify(simplifiedHistory, null, 2)}
 
+User Question:
 ${question}
 
 IMPORTANT RULES
-
 - Answer ONLY in ${language}.
-
-- Use ONLY the extracted data above.
-
-- Never invent values.
-
-- Never guess.
-
-- Never use outside medical information.
-
-- If the requested information is missing, reply:
-
-"This information is not available in the uploaded report."
-
-- If laboratory values are available:
-
-Include
-
-• Test Name
-
-• Result
-
-• Unit
-
-• Reference Range
-
-• Whether Normal, High or Low
-
-- If medicines are requested:
-
-Include
-
-• Medicine Name
-
-• Strength
-
-• Dosage
-
-• Frequency
-
-• Timing
-
-• Purpose
-
-• Special Instructions
-
+- Use ONLY the current data and historical records provided above.
+- If the user asks about progress, trends, or comparisons (e.g., "how is my RBC compared to before?", "has anything improved?"), meticulously analyze values across timelines ('savedAt' fields) and explain what went up, down, or normalized.
+- Never invent values or make assumptions. If information is missing, reply: "This information is not available in the uploaded report or history."
 - Explain everything in very simple language.
-
-- Keep medicine names exactly as written.
-
 - Keep your answer under 180 words.
-
 `;
 
   const response = await fetch(
-
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-
     {
-
       method: "POST",
-
       headers: {
-
         "Content-Type": "application/json",
-
       },
-
       body: JSON.stringify({
-
         contents: [
-
           {
-
-            parts: [
-
-              {
-
-                text: prompt,
-
-              },
-
-            ],
-
+            parts: [{ text: prompt }],
           },
-
         ],
-
       }),
-
     }
-
   );
 
   const data = await response.json();
-
   if (!response.ok) {
-
     throw new Error(data.error?.message || "Gemini Error");
-
   }
 
   return data.candidates[0].content.parts[0].text;
-
 }
+
+
