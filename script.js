@@ -26,6 +26,123 @@ const completedTasks = document.getElementById("completedTasks");
 let treatmentPlan = null;
 const progressText = document.getElementById("progressText");
 
+// Append this implementation to the bottom of your script.js file
+
+const micBtn = document.getElementById("micBtn");
+const chatInputField = document.getElementById("chatInput");
+
+let recognition = null;
+let silenceTimer = null;
+let isListening = false;
+
+// Initialize Web Speech API if supported by the browser
+if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+
+  // Set configurations
+  recognition.continuous = true; // Keep listening even if the user pauses briefly
+  recognition.interimResults = true; // Show results in real-time as the user speaks
+
+  // Handle results streaming in
+  recognition.onresult = (event) => {
+    let interimTranscript = "";
+    let finalTranscript = "";
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+
+    // Update the input field with what the user is saying
+    if (finalTranscript || interimTranscript) {
+      chatInputField.value = finalTranscript || interimTranscript;
+    }
+
+    // Clear any previous silence timeout timer because the user is actively speaking
+    clearTimeout(silenceTimer);
+
+    // Auto-send after 3.5 seconds of silence (3500ms)
+    // Change 3500 to 30000 if you want a strict 30-second pause window instead
+    silenceTimer = setTimeout(() => {
+      if (chatInputField.value.trim() !== "") {
+        stopVoiceListening();
+        // Trigger your existing send button handler click
+        const sendBtn = document.getElementById("sendChatBtn");
+        if (sendBtn) sendBtn.click();
+      }
+    }, 3500);
+  };
+
+  recognition.onerror = (event) => {
+    console.error("Speech recognition error:", event.error);
+    stopVoiceListening();
+  };
+
+  recognition.onend = () => {
+    stopVoiceListening();
+  };
+
+  // Toggle listening state on mic button click
+  micBtn.onclick = () => {
+    if (isListening) {
+      stopVoiceListening();
+    } else {
+      startVoiceListening();
+    }
+  };
+} else {
+  // Hide mic button if browser doesn't support speech tracking
+  if (micBtn) micBtn.style.display = "none";
+  console.log("Web Speech API is not supported in this browser.");
+}
+
+function startVoiceListening() {
+  if (!recognition) return;
+
+  // Dynamically pull the active system language code (e.g. "hi", "en", "te")
+  // from your dropdown selection state
+  let currentLangCode = "en-US";
+  const dropdownLang = document
+    .getElementById("languageList")
+    ?.querySelector(".active")
+    ?.getAttribute("data-lang");
+
+  if (dropdownLang) {
+    if (dropdownLang === "hi") currentLangCode = "hi-IN";
+    else if (dropdownLang === "te") currentLangCode = "te-IN";
+    else if (dropdownLang === "ta") currentLangCode = "ta-IN";
+    else currentLangCode = dropdownLang;
+  }
+
+  recognition.lang = currentLangCode;
+
+  try {
+    recognition.start();
+    isListening = true;
+    micBtn.classList.add("listening");
+    micBtn.innerHTML = "🛑";
+    chatInputField.placeholder = "Listening... Speak now...";
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function stopVoiceListening() {
+  if (!recognition || !isListening) return;
+
+  clearTimeout(silenceTimer);
+  recognition.stop();
+  isListening = false;
+  micBtn.classList.remove("listening");
+  micBtn.innerHTML = "🎙️";
+  chatInputField.placeholder = "Ask about your report or past trends...";
+}
+
 const totalTasks = document.getElementById("totalTasks");
 sendChatBtn.onclick = sendQuestion;
 chatInput.addEventListener("keydown", (e) => {
@@ -389,6 +506,10 @@ function showPreview(file) {
       }
       reportData = result;
       console.log(reportData);
+
+      // Save report data to localStorage history tracking array
+      saveReportToHistory(result);
+
       displayAIAnalysis(result);
       currentReportContext = JSON.stringify(result);
     } catch (error) {
@@ -1121,8 +1242,8 @@ function findLabResult(query) {
 
   query = query.toLowerCase();
 
-  return reportData.labResults.find(test =>
-    test.name.toLowerCase().includes(query)
+  return reportData.labResults.find((test) =>
+    test.name.toLowerCase().includes(query),
   );
 }
 
@@ -1131,8 +1252,8 @@ function findMedicine(query) {
 
   query = query.toLowerCase();
 
-  return reportData.medicines.find(med =>
-    med.name.toLowerCase().includes(query)
+  return reportData.medicines.find((med) =>
+    med.name.toLowerCase().includes(query),
   );
 }
 
@@ -1141,7 +1262,55 @@ function findDiagnosis(query) {
 
   query = query.toLowerCase();
 
-  return reportData.diagnosis.find(item =>
-    item.toLowerCase().includes(query)
+  return reportData.diagnosis.find((item) =>
+    item.toLowerCase().includes(query),
   );
+}
+function saveReportToHistory(newReport) {
+  let history = JSON.parse(localStorage.getItem("medeReportHistory") || "[]");
+
+  newReport.savedAt = new Date().toLocaleDateString();
+
+  const isDuplicate = history.some(
+    (report) =>
+      report.reportTitle === newReport.reportTitle &&
+      report.patientInformation?.name === newReport.patientInformation?.name &&
+      JSON.stringify(report.labResults) ===
+        JSON.stringify(newReport.labResults),
+  );
+
+  if (!isDuplicate) {
+    history.push(newReport);
+    localStorage.setItem("medeReportHistory", JSON.stringify(history));
+  }
+}
+// Append this code block to the very bottom of your script.js file
+
+const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+
+if (clearHistoryBtn) {
+  clearHistoryBtn.onclick = () => {
+    // Confirm with the user before wiping out their data
+    const confirmClear = confirm(
+      "Are you sure you want to delete all saved medical report tracking records? This cannot be undone.",
+    );
+
+    if (confirmClear) {
+      // Remove the history item from localStorage
+      localStorage.removeItem("medeReportHistory");
+
+      // Clear current app runtime reference state if needed
+      // (Optional: cleans up current active chat view elements)
+      const chatMessages = document.getElementById("chatMessages");
+      if (chatMessages) {
+        chatMessages.innerHTML = `
+          <div class="message ai">
+            🗑️ Historical medical data tracking has been cleared successfully. Your next uploaded reports will build a fresh history.
+          </div>
+        `;
+      }
+
+      alert("Medical history tracking cleared successfully.");
+    }
+  };
 }
