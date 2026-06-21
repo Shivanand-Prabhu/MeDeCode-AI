@@ -19,6 +19,14 @@ const chatSection = document.getElementById("chatSection");
 const chatMessages = document.getElementById("chatMessages");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
+const treatmentContainer = document.getElementById("treatmentContainer");
+const treatmentCards = document.getElementById("treatmentCards");
+const progressFill = document.getElementById("progressFill");
+const completedTasks = document.getElementById("completedTasks");
+let treatmentPlan = null;
+const progressText = document.getElementById("progressText");
+
+const totalTasks = document.getElementById("totalTasks");
 sendChatBtn.onclick = sendQuestion;
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -367,12 +375,21 @@ function showPreview(file) {
 
       showTyping();
 
+      const animationPromise = playAnalysisAnimation();
+
       const result = await analyzeMedicalReport(file);
 
+      await animationPromise;
+
+      removeAnalysisAnimation();
+
       hideTyping();
-
+      if (result.treatmentPlan) {
+        displayTreatmentPlan(result.treatmentPlan);
+      }
+      reportData = result;
+      console.log(reportData);
       displayAIAnalysis(result);
-
       currentReportContext = JSON.stringify(result);
     } catch (error) {
       console.error(error);
@@ -600,6 +617,168 @@ function displayAIAnalysis(data) {
 
   addMessage(message, "ai");
   document.getElementById("suggestedQuestions").classList.remove("hidden");
+
+  if (data.treatmentPlan) {
+    displayTreatmentPlan(data.treatmentPlan);
+  }
+}
+function displayTreatmentPlan(plan) {
+  treatmentPlan = plan;
+
+  treatmentContainer.classList.remove("hidden");
+
+  treatmentCards.innerHTML = "";
+
+  const times = [
+    ["morning", "🌅 Morning"],
+
+    ["afternoon", "☀ Afternoon"],
+
+    ["evening", "🌇 Evening"],
+
+    ["night", "🌙 Night"],
+  ];
+
+  times.forEach(([key, title]) => {
+    if (!plan[key] || !plan[key].length) return;
+
+    const card = document.createElement("div");
+
+    card.className = "timeCard";
+
+    card.innerHTML = `<h3>${title}</h3>`;
+
+    plan[key].forEach((item, index) => {
+      const row = document.createElement("label");
+
+      row.className = "task";
+
+      row.innerHTML = `
+
+<input
+
+type="checkbox"
+
+${item.completed ? "checked" : ""}
+
+onchange="toggleTask('${key}',${index},this)">
+
+<div class="taskInfo ${item.completed ? "completed" : ""}">
+
+<b>${item.title || item.medicine}</b>
+
+<small>
+
+${item.dosage || ""}
+
+${item.timing || ""}
+
+</small>
+
+</div>
+
+`;
+
+      card.appendChild(row);
+    });
+
+    treatmentCards.appendChild(card);
+  });
+
+  if (plan.importantInstructions?.length) {
+    const card = document.createElement("div");
+
+    card.className = "timeCard";
+
+    card.innerHTML = "<h3>⚠ Important Instructions</h3>";
+
+    plan.importantInstructions.forEach((item, index) => {
+      card.innerHTML += `
+
+<div class="task">
+
+<input
+
+type="checkbox"
+
+${item.completed ? "checked" : ""}
+
+onchange="toggleInstruction(${index},this)">
+
+<div class="taskInfo ${item.completed ? "completed" : ""}">
+
+<b>${item.title}</b>
+
+</div>
+
+</div>
+
+`;
+    });
+
+    treatmentCards.appendChild(card);
+  }
+
+  updateProgress();
+}
+function toggleTask(time, index, checkbox) {
+  treatmentPlan[time][index].completed = checkbox.checked;
+
+  localStorage.setItem(
+    "treatmentPlan",
+
+    JSON.stringify(treatmentPlan),
+  );
+
+  checkbox.nextElementSibling.classList.toggle(
+    "completed",
+
+    checkbox.checked,
+  );
+
+  updateProgress();
+}
+function toggleInstruction(index, checkbox) {
+  treatmentPlan.importantInstructions[index].completed = checkbox.checked;
+
+  localStorage.setItem(
+    "treatmentPlan",
+
+    JSON.stringify(treatmentPlan),
+  );
+
+  checkbox.nextElementSibling.classList.toggle(
+    "completed",
+
+    checkbox.checked,
+  );
+
+  updateProgress();
+}
+function updateProgress() {
+  let total = 0;
+
+  let done = 0;
+
+  ["morning", "afternoon", "evening", "night"].forEach((time) => {
+    (treatmentPlan[time] || []).forEach((task) => {
+      total++;
+
+      if (task.completed) done++;
+    });
+  });
+
+  (treatmentPlan.importantInstructions || []).forEach((task) => {
+    total++;
+
+    if (task.completed) done++;
+  });
+
+  const percent = total ? (done / total) * 100 : 0;
+
+  progressFill.style.width = percent + "%";
+
+  progressText.innerHTML = done + " / " + total + " Completed";
 }
 let currentSpeech = null;
 
@@ -667,6 +846,22 @@ async function sendQuestion() {
   showTyping();
 
   try {
+    const lowerQuestion = question.toLowerCase();
+
+    if (reportData) {
+      if (
+        lowerQuestion.includes("rbc") ||
+        lowerQuestion.includes("hemoglobin") ||
+        lowerQuestion.includes("cholesterol") ||
+        lowerQuestion.includes("platelet") ||
+        lowerQuestion.includes("wbc") ||
+        lowerQuestion.includes("sugar") ||
+        lowerQuestion.includes("creatinine")
+      ) {
+        // Let Gemini answer using reportContext
+        // (We'll improve this in the next phase.)
+      }
+    }
     const answer = await askFollowUpQuestion(question);
 
     hideTyping();
@@ -742,4 +937,211 @@ function addLoadingMessage() {
   });
 
   return wrapper.querySelector(".loading-text");
+}
+async function playAnalysisAnimation() {
+  const steps = [
+    "📄 Reading your medical report...",
+
+    "🩺 Detecting document type...",
+
+    "🧪 Understanding medical information...",
+
+    "💊 Identifying medicines...",
+
+    "📖 Explaining medical terms...",
+
+    "🌍 Translating if needed...",
+
+    "🧠 Simplifying for everyone...",
+
+    "✨ Preparing your AI explanation...",
+  ];
+
+  const msg = document.createElement("div");
+
+  msg.className = "message ai-message";
+
+  msg.id = "analysisAnimation";
+
+  chatMessages.appendChild(msg);
+
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  for (const step of steps) {
+    msg.innerHTML += `
+<div class="analysis-step">
+${step}
+</div>
+`;
+
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    await new Promise((resolve) => setTimeout(resolve, 550));
+  }
+}
+function removeAnalysisAnimation() {
+  document.getElementById("analysisAnimation")?.remove();
+}
+document.getElementById("copyTreatmentBtn").onclick = () => {
+  if (!treatmentPlan) return;
+
+  let text = "🩺 Today's Treatment Plan\n\n";
+
+  ["morning", "afternoon", "evening", "night"].forEach((time) => {
+    if (!treatmentPlan[time]?.length) return;
+
+    text += time.toUpperCase() + "\n";
+
+    treatmentPlan[time].forEach((item) => {
+      text += "• ";
+
+      text += item.title || item.medicine;
+
+      if (item.dosage) {
+        text += " (" + item.dosage + ")";
+      }
+
+      if (item.timing) {
+        text += " - " + item.timing;
+      }
+
+      text += "\n";
+    });
+
+    text += "\n";
+  });
+
+  if (treatmentPlan.importantInstructions?.length) {
+    text += "IMPORTANT\n";
+
+    treatmentPlan.importantInstructions.forEach((item) => {
+      text += "• " + item.title + "\n";
+    });
+  }
+
+  navigator.clipboard.writeText(text);
+
+  alert("Treatment plan copied!");
+};
+document.getElementById("printTreatmentBtn").onclick = () => {
+  const printWindow = window.open("", "_blank");
+
+  printWindow.document.write(`
+    <html>
+
+    <head>
+
+    <title>Treatment Plan</title>
+
+    <style>
+
+    body{
+
+        font-family:Arial;
+
+        padding:30px;
+
+        line-height:1.8;
+
+    }
+
+    h1{
+
+        color:#2563eb;
+
+    }
+
+    h2{
+
+        margin-top:25px;
+
+    }
+
+    </style>
+
+    </head>
+
+    <body>
+
+    <h1>🩺 Today's Treatment Plan</h1>
+    `);
+
+  ["morning", "afternoon", "evening", "night"].forEach((time) => {
+    if (!treatmentPlan[time]?.length) return;
+
+    printWindow.document.write(`<h2>${time.toUpperCase()}</h2><ul>`);
+
+    treatmentPlan[time].forEach((item) => {
+      printWindow.document.write(
+        `<li>${item.title || item.medicine}
+                ${item.dosage ? " - " + item.dosage : ""}
+                ${item.timing ? " (" + item.timing + ")" : ""}
+                </li>`,
+      );
+    });
+
+    printWindow.document.write("</ul>");
+  });
+
+  if (treatmentPlan.importantInstructions?.length) {
+    printWindow.document.write("<h2>Important Instructions</h2><ul>");
+
+    treatmentPlan.importantInstructions.forEach((item) => {
+      printWindow.document.write(`<li>${item.title}</li>`);
+    });
+
+    printWindow.document.write("</ul>");
+  }
+
+  printWindow.document.write("</body></html>");
+
+  printWindow.document.close();
+
+  printWindow.print();
+};
+function getLabResult(testName) {
+  if (!reportData?.labResults) return null;
+
+  return reportData.labResults.find((test) =>
+    test.name.toLowerCase().includes(testName.toLowerCase()),
+  );
+}
+function getMedicine(name) {
+  if (!reportData?.medicines) return null;
+
+  return reportData.medicines.find((med) =>
+    med.name.toLowerCase().includes(name.toLowerCase()),
+  );
+}
+function getDiagnosis() {
+  return reportData?.diagnosis || [];
+}
+function findLabResult(query) {
+  if (!reportData?.labResults) return null;
+
+  query = query.toLowerCase();
+
+  return reportData.labResults.find(test =>
+    test.name.toLowerCase().includes(query)
+  );
+}
+
+function findMedicine(query) {
+  if (!reportData?.medicines) return null;
+
+  query = query.toLowerCase();
+
+  return reportData.medicines.find(med =>
+    med.name.toLowerCase().includes(query)
+  );
+}
+
+function findDiagnosis(query) {
+  if (!reportData?.diagnosis) return null;
+
+  query = query.toLowerCase();
+
+  return reportData.diagnosis.find(item =>
+    item.toLowerCase().includes(query)
+  );
 }
