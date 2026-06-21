@@ -1,47 +1,295 @@
 const MODEL = "gemini-2.5-flash";
 let reportContext = "";
+let reportData = null;
 
 async function analyzeMedicalReport(file) {
   const language = getSelectedLanguageName();
 
-  const prompt = `
+const prompt = `
 You are MeDeCode AI.
 
-Your job is to explain medical documents in a way that an ordinary person can understand.
+You are an expert AI assistant specialized in understanding medical documents.
 
-IMPORTANT RULES:
+Your primary responsibility is ACCURACY.
 
-- Respond ONLY in ${language}.
-- Never diagnose diseases.
-- Never replace professional medical advice.
-- Explain everything simply as if talking to a 12-year-old.
-- Keep medical terms but explain them.
-- Mention emergency concerns ONLY if they are clearly supported by the report.
-- Never invent information.
-- If something is missing, clearly say so.
-- Keep the summary under 120 words.
-- Do NOT wrap your response inside \`\`\`.
-- Return ONLY valid JSON.
+Read the uploaded medical document carefully before generating any response.
 
-The JSON MUST ALWAYS follow this format:
+------------------------------
+DOCUMENT READING RULES
+------------------------------
+
+1. Read EVERY page completely.
+2. Read every table, prescription, investigation, handwritten note, footer and header.
+3. Never skip any medicine.
+4. Never skip any dosage.
+5. Never skip any laboratory result.
+6. Never skip any diagnosis.
+7. Never skip any doctor's instruction.
+8. Never invent information.
+9. If information is missing, clearly state it is unavailable.
+10. Perform extraction FIRST.
+11. Generate the explanation only AFTER extraction is complete.
+
+------------------------------
+LANGUAGE
+------------------------------
+
+Respond ONLY in ${language}.
+
+Translate explanations only.
+
+NEVER translate:
+
+- Medicine names
+- Drug brand names
+- Generic medicine names
+- Laboratory test names
+- Hospital names
+- Doctor names
+
+Keep those exactly as written.
+
+------------------------------
+EXPLANATION STYLE
+------------------------------
+
+Explain everything so a 12-year-old can understand.
+
+Do NOT diagnose diseases.
+
+Do NOT replace professional medical advice.
+
+Keep the summary below 120 words.
+
+Mention emergency concerns ONLY if clearly supported by the report.
+
+------------------------------
+MEDICINE EXTRACTION
+------------------------------
+
+Extract EVERY medicine exactly as written.
+
+For each medicine extract:
+
+- name
+- strength
+- dosage
+- frequency
+- duration
+- timing
+- purpose
+- specialInstructions
+
+If timing exists:
+
+After Breakfast → morning
+
+Before Breakfast → morning
+
+Empty Stomach → morning
+
+After Lunch → afternoon
+
+Before Lunch → afternoon
+
+Evening → evening
+
+After Dinner → night
+
+Before Sleeping → night
+
+If timing is not written,
+
+write:
+
+Estimated Timing
+
+Never omit medicines.
+
+Every medicine MUST appear exactly once inside treatmentPlan.
+
+------------------------------
+LAB RESULTS
+------------------------------
+
+Extract EVERY laboratory value.
+
+Examples include but are not limited to:
+
+RBC
+
+WBC
+
+Hemoglobin
+
+Platelets
+
+Blood Sugar
+
+HbA1c
+
+Creatinine
+
+Urea
+
+Sodium
+
+Potassium
+
+Cholesterol
+
+HDL
+
+LDL
+
+Triglycerides
+
+Liver Function Tests
+
+Kidney Function Tests
+
+Thyroid Tests
+
+Vitamin Levels
+
+Urine Tests
+
+For EACH test return:
+
+name
+
+value
+
+unit
+
+referenceRange
+
+status
+
+Status must be exactly one of:
+
+Normal
+
+High
+
+Low
+
+Borderline
+
+Unknown
+
+------------------------------
+RETURN JSON ONLY
 
 {
 "documentType":"",
+"reportTitle":"",
 "summary":"",
 "criticalAlerts":[],
+
+"patientInformation":{
+"name":"",
+"age":"",
+"gender":"",
+"patientId":""
+},
+
+"doctorInformation":{
+"name":"",
+"hospital":"",
+"department":""
+},
+
+"diagnosis":[],
+
+"vitals":[
+{
+"name":"",
+"value":"",
+"unit":""
+}
+],
+
+"labResults":[
+{
+"name":"",
+"value":"",
+"unit":"",
+"referenceRange":"",
+"status":""
+}
+],
+
 "medicalTerms":[
 {
 "term":"",
 "meaning":""
 }
 ],
-"medicines":[],
-"dietSuggestions":[],
-"nextSteps":[],
-"questionsForDoctor":[]
-}
-`;
 
+"medicines":[
+{
+"name":"",
+"strength":"",
+"dosage":"",
+"frequency":"",
+"duration":"",
+"timing":"",
+"purpose":"",
+"specialInstructions":""
+}
+],
+
+"dietSuggestions":[],
+
+"nextSteps":[],
+
+"questionsForDoctor":[],
+
+"treatmentPlan":{
+
+"morning":[],
+
+"afternoon":[],
+
+"evening":[],
+
+"night":[],
+
+"importantInstructions":[]
+
+}
+
+}
+
+------------------------------
+FINAL VERIFICATION
+
+Before returning your JSON verify:
+
+✓ Every medicine has been extracted.
+
+✓ Every medicine appears inside treatmentPlan.
+
+✓ Every laboratory result has been extracted.
+
+✓ Every diagnosis has been extracted.
+
+✓ Every numerical value has been extracted.
+
+✓ Every dosage has been extracted.
+
+✓ Every doctor's instruction has been extracted.
+
+✓ No information has been invented.
+
+Return ONLY valid JSON.
+
+Do NOT use markdown.
+
+Do NOT wrap the JSON inside triple backticks.
+
+`;
   const base64 = await fileToBase64(file);
 
   const body = {
@@ -102,6 +350,7 @@ The JSON MUST ALWAYS follow this format:
   try {
     const parsed = JSON.parse(cleaned);
 
+    reportData = parsed;
     reportContext = JSON.stringify(parsed);
 
     return parsed;
@@ -155,56 +404,221 @@ function getSelectedLanguageName() {
 
   return map[code] || "English";
 }
+
 async function askFollowUpQuestion(question) {
+
   const language = getSelectedLanguageName();
 
+  const lowerQuestion = question.toLowerCase();
+
+  let relevantData = reportData;
+
+  // Laboratory Questions
+  if (
+    lowerQuestion.includes("rbc") ||
+    lowerQuestion.includes("wbc") ||
+    lowerQuestion.includes("hemoglobin") ||
+    lowerQuestion.includes("platelet") ||
+    lowerQuestion.includes("cholesterol") ||
+    lowerQuestion.includes("hdl") ||
+    lowerQuestion.includes("ldl") ||
+    lowerQuestion.includes("triglyceride") ||
+    lowerQuestion.includes("creatinine") ||
+    lowerQuestion.includes("glucose") ||
+    lowerQuestion.includes("sugar") ||
+    lowerQuestion.includes("hba1c") ||
+    lowerQuestion.includes("vitamin") ||
+    lowerQuestion.includes("calcium") ||
+    lowerQuestion.includes("potassium") ||
+    lowerQuestion.includes("sodium")
+  ) {
+
+    relevantData = reportData?.labResults || [];
+
+  }
+
+  // Medicine Questions
+  else if (
+
+    lowerQuestion.includes("medicine") ||
+    lowerQuestion.includes("tablet") ||
+    lowerQuestion.includes("capsule") ||
+    lowerQuestion.includes("drug") ||
+    lowerQuestion.includes("dose") ||
+    lowerQuestion.includes("dosage") ||
+    lowerQuestion.includes("take") ||
+    lowerQuestion.includes("pill")
+
+  ) {
+
+    relevantData = reportData?.medicines || [];
+
+  }
+
+  // Diagnosis
+
+  else if (
+
+    lowerQuestion.includes("diagnosis") ||
+    lowerQuestion.includes("disease") ||
+    lowerQuestion.includes("condition") ||
+    lowerQuestion.includes("problem")
+
+  ) {
+
+    relevantData = reportData?.diagnosis || [];
+
+  }
+
+  // Diet
+
+  else if (
+
+    lowerQuestion.includes("diet") ||
+    lowerQuestion.includes("eat") ||
+    lowerQuestion.includes("food") ||
+    lowerQuestion.includes("drink")
+
+  ) {
+
+    relevantData = reportData?.dietSuggestions || [];
+
+  }
+
+  // Doctor Advice
+
+  else if (
+
+    lowerQuestion.includes("doctor") ||
+    lowerQuestion.includes("follow") ||
+    lowerQuestion.includes("next") ||
+    lowerQuestion.includes("instruction") ||
+    lowerQuestion.includes("advice")
+
+  ) {
+
+    relevantData = reportData?.nextSteps || [];
+
+  }
+
   const prompt = `
+
 You are MeDeCode AI.
 
 The user has already uploaded a medical report.
 
-Here is the report analysis:
+The following extracted information is the ONLY information you may use.
 
-${reportContext}
+${JSON.stringify(relevantData, null, 2)}
 
 User Question:
 
 ${question}
 
-IMPORTANT:
+IMPORTANT RULES
 
 - Answer ONLY in ${language}.
-- Answer based ONLY on the uploaded report.
-- If the report does not contain enough information, clearly say so.
-- Keep your answer short, simple and reassuring.
+
+- Use ONLY the extracted data above.
+
+- Never invent values.
+
+- Never guess.
+
+- Never use outside medical information.
+
+- If the requested information is missing, reply:
+
+"This information is not available in the uploaded report."
+
+- If laboratory values are available:
+
+Include
+
+• Test Name
+
+• Result
+
+• Unit
+
+• Reference Range
+
+• Whether Normal, High or Low
+
+- If medicines are requested:
+
+Include
+
+• Medicine Name
+
+• Strength
+
+• Dosage
+
+• Frequency
+
+• Timing
+
+• Purpose
+
+• Special Instructions
+
+- Explain everything in very simple language.
+
+- Keep medicine names exactly as written.
+
+- Keep your answer under 180 words.
+
 `;
 
   const response = await fetch(
+
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+
     {
+
       method: "POST",
+
       headers: {
+
         "Content-Type": "application/json",
+
       },
+
       body: JSON.stringify({
+
         contents: [
+
           {
+
             parts: [
+
               {
+
                 text: prompt,
+
               },
+
             ],
+
           },
+
         ],
+
       }),
-    },
+
+    }
+
   );
 
   const data = await response.json();
 
   if (!response.ok) {
+
     throw new Error(data.error?.message || "Gemini Error");
+
   }
 
   return data.candidates[0].content.parts[0].text;
+
 }
