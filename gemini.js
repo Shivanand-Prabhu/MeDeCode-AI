@@ -5,7 +5,7 @@ let reportData = null;
 async function analyzeMedicalReport(file) {
   const language = getSelectedLanguageName();
 
-const prompt = `
+  const prompt = `
 You are MeDeCode AI.
 
 You are an expert AI assistant specialized in understanding medical documents.
@@ -246,20 +246,42 @@ RETURN JSON ONLY
 
 "questionsForDoctor":[],
 
-"treatmentPlan":{
+// ... Locate this inside the prompt variable within gemini.js ...
 
-"morning":[],
-
-"afternoon":[],
-
-"evening":[],
-
-"night":[],
-
-"importantInstructions":[]
-
-}
-
+"treatmentPlan": {
+  "morning": [
+    {
+      "medicine": "Medicine Name",
+      "dosage": "Dosage/Strength",
+      "timing": "Specific instruction (e.g., After Breakfast)"
+    }
+  ],
+  "afternoon": [
+    {
+      "medicine": "Medicine Name",
+      "dosage": "Dosage/Strength",
+      "timing": "Specific instruction (e.g., After Lunch)"
+    }
+  ],
+  "evening": [
+    {
+      "medicine": "Medicine Name",
+      "dosage": "Dosage/Strength",
+      "timing": "Specific instruction (e.g., Evening)"
+    }
+  ],
+  "night": [
+    {
+      "medicine": "Medicine Name",
+      "dosage": "Dosage/Strength",
+      "timing": "Specific instruction (e.g., Before Sleeping)"
+    }
+  ],
+  "importantInstructions": [
+    {
+      "title": "Instruction text details"
+    }
+  ]
 }
 
 ------------------------------
@@ -483,12 +505,12 @@ async function askFollowUpQuestion(question) {
   const historyData = JSON.parse(rawHistory);
 
   // Strip down historical entries to vital context elements only
-  const simplifiedHistory = historyData.map(report => ({
+  const simplifiedHistory = historyData.map((report) => ({
     savedAt: report.savedAt,
     documentType: report.documentType,
     reportTitle: report.reportTitle,
     labResults: report.labResults || [],
-    diagnosis: report.diagnosis || []
+    diagnosis: report.diagnosis || [],
   }));
 
   const prompt = `
@@ -532,7 +554,7 @@ IMPORTANT RULES
           },
         ],
       }),
-    }
+    },
   );
 
   const data = await response.json();
@@ -542,5 +564,3 @@ IMPORTANT RULES
 
   return data.candidates[0].content.parts[0].text;
 }
-
-
