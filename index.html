@@ -18,7 +18,7 @@
         <nav>
 
             <div class="logo">
-                <img src="Logo.jpg" alt="MeDeCode Logo">
+                <img src="Assets/Logo.jpg" alt="MeDeCode Logo">
                 <h2>MeDeCode</h2>
             </div>
 
@@ -108,7 +108,7 @@
                 <div class="empty-chat" id="emptyChat">
 
                     <div class="avatar-placeholder">
-                        <img src="AI.png" id="aiAvatar" alt="MeDeCode AI">
+                        <img src="Assets/AI.png" id="aiAvatar" alt="MeDeCode AI">
                     </div>
 
                     <h2>Welcome to MeDeCode AI</h2>
@@ -159,6 +159,59 @@
                 <button id="sendChatBtn">➤</button>
             </div>
         </section>
+        <div id="treatmentContainer" class="hidden">
+
+            <div class="treatmentTop">
+
+                <h2>🩺 Today's Health Companion</h2>
+
+                <div id="progressText">
+                    0 / 0 Completed
+                </div>
+
+            </div>
+
+            <div class="progressOuter">
+
+                <div id="progressFill"></div>
+
+            </div>
+
+            <div id="treatmentCards"></div>
+
+        </div>
+
+        <div id="treatmentContainer" class="hidden">
+
+            <h2>🩺 Today's Treatment Plan</h2>
+
+            <div class="progress-text">
+                <span id="completedTasks">0</span> /
+                <span id="totalTasks">0</span>
+                completed
+            </div>
+
+        </div>
+
+        <div class="progress-bar">
+
+            <div id="progressFill"></div>
+
+        </div>
+
+        <div id="treatment-actions" class = "hidden">
+
+            <button id="copyTreatmentBtn" class="treatment-btn">
+                📋 Copy Plan
+            </button>
+
+            <button id="printTreatmentBtn" class="treatment-btn">
+                🖨 Print
+            </button>
+
+        </div>
+
+        </div>
         <footer>
             <p>
                 © 2026 <strong>MeDeCode</strong> • <span data-i18n="footerLine">Making healthcare understandable for
