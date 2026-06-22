@@ -206,27 +206,6 @@ Our vision is to eliminate confusion surrounding medical documents and empower e
 
 Healthcare literacy should be universal—not limited by medical jargon, language, or age.
 
----
-
-# 🤝 Contributing
-
-Contributions are welcome!
-
-Feel free to:
-
-- Fork the repository
-- Create feature branches
-- Submit pull requests
-- Report bugs
-- Suggest improvements
-
----
-
-# 📜 License
-
-This project is licensed under the MIT License.
-
----
 
 # 👨‍💻 Developer
 
